@@ -28,6 +28,10 @@ type FakeCmaV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeCmaV1alpha1) SDSAppSuites(namespace string) v1alpha1.SDSAppSuiteInterface {
+	return &FakeSDSAppSuites{c, namespace}
+}
+
 func (c *FakeCmaV1alpha1) SDSApplications(namespace string) v1alpha1.SDSApplicationInterface {
 	return &FakeSDSApplications{c, namespace}
 }

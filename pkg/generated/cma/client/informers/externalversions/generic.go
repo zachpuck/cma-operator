@@ -53,6 +53,8 @@ func (f *genericInformer) Lister() cache.GenericLister {
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=cma.sds.samsung.com, Version=v1alpha1
+	case v1alpha1.SchemeGroupVersion.WithResource("sdsappsuites"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Cma().V1alpha1().SDSAppSuites().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("sdsapplications"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Cma().V1alpha1().SDSApplications().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("sdsclusters"):

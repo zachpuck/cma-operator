@@ -13,6 +13,8 @@ const (
 	SDSApplicationResourcePlural    = "sdsapplications"
 	SDSPackageManagerResourceKind   = "SDSPackageManager"
 	SDSPackageManagerResourcePlural = "sdspackagemanagers"
+	SDSAppSuiteResourceKind         = "SDSAppSuite"
+	SDSAppSuiteResourcePlural       = "sdsappsuites"
 	groupName                       = "cma.sds.samsung.com"
 )
 
@@ -24,6 +26,7 @@ var (
 	SDSClusterCRDName        = SDSClusterResourcePlural + "." + groupName
 	SDSApplicationCRDName    = SDSApplicationResourcePlural + "." + groupName
 	SDSPackageManagerCRDName = SDSPackageManagerResourcePlural + "." + groupName
+	SDSAppSuiteCRDName       = SDSAppSuiteResourcePlural + "." + groupName
 )
 
 // addKnownTypes adds the set of types defined in this package to the supplied scheme.
@@ -35,6 +38,8 @@ func addKnownTypes(s *runtime.Scheme) error {
 		&SDSApplicationList{},
 		&SDSPackageManager{},
 		&SDSPackageManagerList{},
+		&SDSAppSuite{},
+		&SDSAppSuiteList{},
 	)
 	metav1.AddToGroupVersion(s, SchemeGroupVersion)
 	return nil

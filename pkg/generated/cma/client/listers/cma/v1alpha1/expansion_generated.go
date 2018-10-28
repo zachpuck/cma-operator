@@ -18,6 +18,14 @@ limitations under the License.
 
 package v1alpha1
 
+// SDSAppSuiteListerExpansion allows custom methods to be added to
+// SDSAppSuiteLister.
+type SDSAppSuiteListerExpansion interface{}
+
+// SDSAppSuiteNamespaceListerExpansion allows custom methods to be added to
+// SDSAppSuiteNamespaceLister.
+type SDSAppSuiteNamespaceListerExpansion interface{}
+
 // SDSApplicationListerExpansion allows custom methods to be added to
 // SDSApplicationLister.
 type SDSApplicationListerExpansion interface{}

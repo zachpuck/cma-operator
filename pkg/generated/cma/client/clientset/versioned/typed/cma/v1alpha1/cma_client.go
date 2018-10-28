@@ -27,6 +27,7 @@ import (
 
 type CmaV1alpha1Interface interface {
 	RESTClient() rest.Interface
+	SDSAppSuitesGetter
 	SDSApplicationsGetter
 	SDSClustersGetter
 	SDSPackageManagersGetter
@@ -35,6 +36,10 @@ type CmaV1alpha1Interface interface {
 // CmaV1alpha1Client is used to interact with features provided by the cma.sds.samsung.com group.
 type CmaV1alpha1Client struct {
 	restClient rest.Interface
+}
+
+func (c *CmaV1alpha1Client) SDSAppSuites(namespace string) SDSAppSuiteInterface {
+	return newSDSAppSuites(c, namespace)
 }
 
 func (c *CmaV1alpha1Client) SDSApplications(namespace string) SDSApplicationInterface {

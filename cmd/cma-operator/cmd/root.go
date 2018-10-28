@@ -87,6 +87,8 @@ func operator() {
 	k8sutil.CreateCRD(apiextensionsclient.NewForConfigOrDie(k8sutil.DefaultConfig), cma.GenerateSDSPackageManagerCRD())
 	// Install the CMA SDSApplication CRD
 	k8sutil.CreateCRD(apiextensionsclient.NewForConfigOrDie(k8sutil.DefaultConfig), cma.GenerateSDSApplicationCRD())
+	// Install the CMA SDSAppSuite CRD
+	k8sutil.CreateCRD(apiextensionsclient.NewForConfigOrDie(k8sutil.DefaultConfig), cma.GenerateSDSAppSuiteCRD())
 
 	var wg sync.WaitGroup
 	stop := make(chan struct{})
