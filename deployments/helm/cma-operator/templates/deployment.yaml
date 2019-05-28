@@ -35,3 +35,5 @@ spec:
         {{- end }}
         - name: CMAOPERATOR_KUBERNETES_NAMESPACE
           value: "{{ .Release.Namespace}}"
+        - name: CMP
+          value: "{{ .Values.cmp }}"

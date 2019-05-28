@@ -16,7 +16,7 @@ import (
 
 const (
 	SDSServiceAccountName = "sds-sa"
-	SDSClusterRoleName = "sds-sa-cluster-role"
+	SDSClusterRoleName    = "sds-sa-cluster-role"
 )
 
 type SDSTokenClient struct {
@@ -44,7 +44,7 @@ func NewSDSTokenClient(config *rest.Config) (*SDSTokenClient, error) {
 	return output, nil
 }
 
-func (c *SDSTokenClient) CreateSDSToken(sdsCluster *v1alpha1.SDSCluster, namespace string) ([]byte, error){
+func (c *SDSTokenClient) CreateSDSToken(sdsCluster *v1alpha1.SDSCluster, namespace string) ([]byte, error) {
 	SetLogger()
 	// the namespace on the managed clusters that the service account will be created in.
 	saNamespace := "kube-system"
@@ -86,7 +86,7 @@ func (c *SDSTokenClient) CreateSDSToken(sdsCluster *v1alpha1.SDSCluster, namespa
 	}
 
 	// save token as secret in cmc
-	err = k8sutil.CreateSecret(clusterName + "-" + SDSServiceAccountName + "-token", namespace, sdsCluster, "token", secret.Data["token"], nil)
+	err = k8sutil.CreateSecret(clusterName+"-"+SDSServiceAccountName+"-token", namespace, sdsCluster, "token", secret.Data["token"], nil)
 	if err != nil {
 		logger.Infof("could not save token -->%s<-- for service account -->%s<--, due to the following error %s", tokenName, SDSServiceAccountName, err)
 	}

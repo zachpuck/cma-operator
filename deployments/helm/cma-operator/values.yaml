@@ -16,3 +16,4 @@ bundles:
    metrics: true
    nginxk8smon: true
    nodelabelbot5000: true
+cmp: false

@@ -47,16 +47,16 @@ func CreateSecret(name string, namespace string, sdsCluster *v1alpha1.SDSCluster
 	ownerReferences := []v1.OwnerReference{
 		*v1.NewControllerRef(sdsCluster,
 			runtimeSchema.GroupVersionKind{
-				Group: api.SchemeGroupVersion.Group,
+				Group:   api.SchemeGroupVersion.Group,
 				Version: api.SchemeGroupVersion.Version,
-				Kind: "SDSCluster",
+				Kind:    "SDSCluster",
 			}),
 	}
 
 	secret := &corev1.Secret{
 		ObjectMeta: v1.ObjectMeta{Name: name, OwnerReferences: ownerReferences},
-		Type: corev1.SecretTypeOpaque,
-		Data: dataMap,
+		Type:       corev1.SecretTypeOpaque,
+		Data:       dataMap,
 	}
 
 	_, err = clientSet.CoreV1().Secrets(namespace).Create(secret)

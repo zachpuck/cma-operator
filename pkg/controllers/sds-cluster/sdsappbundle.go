@@ -86,9 +86,9 @@ func (c *SDSClusterController) createBundlePackageManager(bundle *api.SDSAppBund
 		bundlePackageManager.OwnerReferences = []v1.OwnerReference{
 			*v1.NewControllerRef(cluster,
 				runtimeSchema.GroupVersionKind{
-					Group: api.SchemeGroupVersion.Group,
+					Group:   api.SchemeGroupVersion.Group,
 					Version: api.SchemeGroupVersion.Version,
-					Kind: "SDSCluster",
+					Kind:    "SDSCluster",
 				}),
 		}
 
@@ -140,9 +140,9 @@ func (c *SDSClusterController) createBundleApplications(bundle *api.SDSAppBundle
 			sdsApplication.OwnerReferences = []v1.OwnerReference{
 				*v1.NewControllerRef(cluster,
 					runtimeSchema.GroupVersionKind{
-						Group: api.SchemeGroupVersion.Group,
+						Group:   api.SchemeGroupVersion.Group,
 						Version: api.SchemeGroupVersion.Version,
-						Kind: "SDSCluster",
+						Kind:    "SDSCluster",
 					}),
 			}
 

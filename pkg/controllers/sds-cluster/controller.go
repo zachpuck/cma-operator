@@ -6,9 +6,10 @@ import (
 	"github.com/docker/distribution/uuid"
 	"github.com/samsung-cnct/cma-operator/pkg/util/cmagrpc"
 	"github.com/samsung-cnct/cma-operator/pkg/util/sds/callback"
-	"github.com/samsung-cnct/cma-operator/pkg/util/sds/token"
+	sdstoken "github.com/samsung-cnct/cma-operator/pkg/util/sds/token"
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"os"
 	"time"
 
 	"k8s.io/apimachinery/pkg/fields"
@@ -20,12 +21,12 @@ import (
 	"github.com/samsung-cnct/cma-operator/pkg/generated/cma/client/clientset/versioned"
 	"github.com/samsung-cnct/cma-operator/pkg/util"
 	"github.com/samsung-cnct/cma-operator/pkg/util/k8sutil"
+	runtimeSchema "k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	runtimeSchema "k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const (
@@ -289,141 +290,11 @@ func (c *SDSClusterController) handleClusterReady(clusterName string, clusterInf
 		if bundleErr != nil {
 			logger.Errorf("something bad happened when checking SDSAppBundles for cluster -->%s<-- error: %s", clusterName, err)
 		}
-		// check if logging package manager exists
-		clusterLoggingPackageManagerName := LoggingPackageManagerName + "-" + clusterName
-		_, err := c.client.CmaV1alpha1().SDSPackageManagers(viper.GetString(KubernetesNamespaceViperVariableName)).Get(clusterLoggingPackageManagerName, v1.GetOptions{})
-		if err != nil {
-			logger.Errorf("the logging package manager for cluster -->%s<-- does not exist! creating it", clusterName)
 
-			// create sdsPackageManager for logging
-			loggingPackageManager := &api.SDSPackageManager{
-				Spec: api.SDSPackageManagerSpec{
-					Name:      LoggingPackageManagerName,
-					Namespace: LoggingNamespace,
-					Version:   "v2.11.0",
-					Image:     "gcr.io/kubernetes-helm/tiller",
-					ServiceAccount: api.ServiceAccount{
-						Name:      LoggingPackageManagerName,
-						Namespace: LoggingNamespace,
-					},
-					Permissions: api.PackageManagerPermissions{
-						ClusterWide: true,
-						Namespaces: []string{
-							LoggingNamespace,
-						},
-					},
-					Cluster: api.SDSClusterRef{
-						Name: clusterName,
-					},
-				},
-			}
-
-			// set owner reference
-			loggingPackageManager.OwnerReferences = []v1.OwnerReference{
-				*v1.NewControllerRef(freshCopy,
-					runtimeSchema.GroupVersionKind{
-						Group: api.SchemeGroupVersion.Group,
-						Version: api.SchemeGroupVersion.Version,
-						Kind: "SDSCluster",
-					}),
-			}
-
-			loggingPackageManager.Name = loggingPackageManager.Spec.Name + "-" + clusterName
-			loggingPackageManager.Namespace = viper.GetString(KubernetesNamespaceViperVariableName)
-
-			newLoggerPackageManager, err := c.client.CmaV1alpha1().SDSPackageManagers(viper.GetString(KubernetesNamespaceViperVariableName)).Create(loggingPackageManager)
-			if err != nil {
-				logger.Errorf("something bad happened when creating logging package manager for cluster -->%s<-- error: %s", clusterName, err)
-			}
-			logger.Infof("create logging package manager -->%s<-- for cluster -->%s<--", newLoggerPackageManager.Name, clusterName)
+		// Check if part of CMP and if so setup required apps.
+		if os.Getenv("CMP") == "true" {
+			c.setupForCMP(freshCopy, clusterName, clusterInfo)
 		}
-
-		// check if logging application exists
-		clusterLoggingApplicationName := LoggingApplicationName + "-" + LoggingPackageManagerName + "-" + clusterName
-		_, err = c.client.CmaV1alpha1().SDSApplications(viper.GetString(KubernetesNamespaceViperVariableName)).Get(clusterLoggingApplicationName, v1.GetOptions{})
-		if err != nil {
-			logger.Errorf("the logging application for cluster -->%s<-- does not exist, we should create it,", clusterName)
-
-			// create sdsApplication for logging
-			// TODO: get the ElasticSearchHost
-			// TODO: get the elasticSearch Password
-			uuidForLogging := uuid.Generate()
-
-			loggerApplication := &api.SDSApplication{
-				Spec: api.SDSApplicationSpec{
-					PackageManager: api.SDSPackageManagerRef{
-						Name: LoggingPackageManagerName,
-					},
-					Namespace: LoggingNamespace,
-					Name:      LoggingApplicationName,
-					Chart: api.Chart{
-						Name: LoggingApplicationName,
-						Repository: api.ChartRepository{
-							Name: LoggingApplicationName,
-							URL:  "https://charts.cnct.io",
-						},
-					},
-					Values: "fluent-bit:\n name: fluent-bit\n cluster_uuid: " + uuidForLogging.String() + "\n elasticSearchHost: es.aws.uswest1.hybridstack.cnct.io\n elasticSearchPassword: changeme",
-					Cluster: api.SDSClusterRef{
-						Name: clusterName,
-					},
-				},
-			}
-
-			// set owner reference
-			loggerApplication.OwnerReferences = []v1.OwnerReference{
-				*v1.NewControllerRef(freshCopy,
-					runtimeSchema.GroupVersionKind{
-						Group: api.SchemeGroupVersion.Group,
-						Version: api.SchemeGroupVersion.Version,
-						Kind: "SDSCluster",
-					}),
-			}
-
-			loggerApplication.Name = clusterLoggingApplicationName
-			loggerApplication.Namespace = viper.GetString(KubernetesNamespaceViperVariableName)
-			newLoggerApplication, err := c.client.CmaV1alpha1().SDSApplications(viper.GetString(KubernetesNamespaceViperVariableName)).Create(loggerApplication)
-			if err != nil {
-				logger.Errorf("something bad happened when creating the logging application for cluster -->%s<-- error: %s", clusterName, err)
-			}
-			logger.Infof("create logging application -->%s<-- for cluster -->%s<--", newLoggerApplication.Name, clusterName)
-		}
-		// End of logging
-
-		// parse the kubeconfig string for api endpoint
-		// ingress and service for managed cluster api server
-		clusterApiEndpointServiceName := ApiEndpointBackendServiceName + "-" + clusterName
-		apiEndpoint, err := k8sutil.GetClusterEndpoint(clusterInfo.Kubeconfig)
-		if err != nil {
-			logger.Errorf("something bad happened when getting api endpoint for cluster -->%s<-- error: %s", clusterName, err)
-		}
-
-		_, err = k8sutil.CreateExternalService(
-			k8sutil.GenerateExternalService(clusterApiEndpointServiceName, apiEndpoint),
-			freshCopy, nil)
-		if err != nil {
-			logger.Errorf("something bad happened when creating the service for cluster -->%s<-- error: %s", clusterName, err)
-		}
-
-		clusterApiEndpointIngressName := ApiEndpointIngressName + "-" + clusterName
-		_, err = k8sutil.CreateIngress(
-			k8sutil.GenerateIngress(clusterApiEndpointIngressName, clusterName, clusterApiEndpointServiceName),
-			freshCopy, nil)
-		if err != nil {
-			logger.Errorf("something bad happened when creating the ingress for cluster -->%s<-- error: %s", clusterName, err)
-		}
-
-		// bearer token service account
-		sdsTokenClient, err := sdstoken.NewSDSTokenClient(nil)
-		if err != nil {
-			logger.Errorf("unable to create new sds token client", err)
-		}
-		token, err := sdsTokenClient.CreateSDSToken(freshCopy, viper.GetString(KubernetesNamespaceViperVariableName))
-		if err != nil {
-			logger.Errorf("unable to create sds token, error message: %s", err)
-		}
-		clusterInfo.Bearertoken = string(token)
-		// End bearer token service account
 
 		// We need to notify someone that the cluster is now ready (again)
 		dataPayload, _ := json.Marshal(sdscallback.ClusterDataPayload{
@@ -488,7 +359,7 @@ func (c *SDSClusterController) handleDeletedCluster(cluster *api.SDSCluster) {
 func (c *SDSClusterController) handleFailedCluster(cluster *api.SDSCluster) {
 	// We need to notify someone that the cluster has failed
 	dataPayload, _ := json.Marshal(sdscallback.ClusterDataPayload{
-		ClusterStatus:    api.ClusterPhaseFailed,
+		ClusterStatus: api.ClusterPhaseFailed,
 	})
 
 	message := &sdscallback.ClusterMessage{
@@ -509,4 +380,143 @@ func (c *SDSClusterController) handleFailedCluster(cluster *api.SDSCluster) {
 
 func (c *SDSClusterController) handleUpgradedCluster(cluster *api.SDSCluster) {
 
+}
+
+func (c *SDSClusterController) setupForCMP(freshCopy *api.SDSCluster, clusterName string, clusterInfo cmagrpc.GetClusterOutput) {
+
+	// check if logging package manager exists
+	clusterLoggingPackageManagerName := LoggingPackageManagerName + "-" + clusterName
+	_, err := c.client.CmaV1alpha1().SDSPackageManagers(viper.GetString(KubernetesNamespaceViperVariableName)).Get(clusterLoggingPackageManagerName, v1.GetOptions{})
+	if err != nil {
+		logger.Errorf("the logging package manager for cluster -->%s<-- does not exist! creating it", clusterName)
+
+		// create sdsPackageManager for logging
+		loggingPackageManager := &api.SDSPackageManager{
+			Spec: api.SDSPackageManagerSpec{
+				Name:      LoggingPackageManagerName,
+				Namespace: LoggingNamespace,
+				Version:   "v2.11.0",
+				Image:     "gcr.io/kubernetes-helm/tiller",
+				ServiceAccount: api.ServiceAccount{
+					Name:      LoggingPackageManagerName,
+					Namespace: LoggingNamespace,
+				},
+				Permissions: api.PackageManagerPermissions{
+					ClusterWide: true,
+					Namespaces: []string{
+						LoggingNamespace,
+					},
+				},
+				Cluster: api.SDSClusterRef{
+					Name: clusterName,
+				},
+			},
+		}
+
+		// set owner reference
+		loggingPackageManager.OwnerReferences = []v1.OwnerReference{
+			*v1.NewControllerRef(freshCopy,
+				runtimeSchema.GroupVersionKind{
+					Group:   api.SchemeGroupVersion.Group,
+					Version: api.SchemeGroupVersion.Version,
+					Kind:    "SDSCluster",
+				}),
+		}
+
+		loggingPackageManager.Name = loggingPackageManager.Spec.Name + "-" + clusterName
+		loggingPackageManager.Namespace = viper.GetString(KubernetesNamespaceViperVariableName)
+
+		newLoggerPackageManager, err := c.client.CmaV1alpha1().SDSPackageManagers(viper.GetString(KubernetesNamespaceViperVariableName)).Create(loggingPackageManager)
+		if err != nil {
+			logger.Errorf("something bad happened when creating logging package manager for cluster -->%s<-- error: %s", clusterName, err)
+		}
+		logger.Infof("create logging package manager -->%s<-- for cluster -->%s<--", newLoggerPackageManager.Name, clusterName)
+	}
+
+	// check if logging application exists
+	clusterLoggingApplicationName := LoggingApplicationName + "-" + LoggingPackageManagerName + "-" + clusterName
+	_, err = c.client.CmaV1alpha1().SDSApplications(viper.GetString(KubernetesNamespaceViperVariableName)).Get(clusterLoggingApplicationName, v1.GetOptions{})
+	if err != nil {
+		logger.Errorf("the logging application for cluster -->%s<-- does not exist, we should create it,", clusterName)
+
+		// create sdsApplication for logging
+		// TODO: get the ElasticSearchHost
+		// TODO: get the elasticSearch Password
+		uuidForLogging := uuid.Generate()
+
+		loggerApplication := &api.SDSApplication{
+			Spec: api.SDSApplicationSpec{
+				PackageManager: api.SDSPackageManagerRef{
+					Name: LoggingPackageManagerName,
+				},
+				Namespace: LoggingNamespace,
+				Name:      LoggingApplicationName,
+				Chart: api.Chart{
+					Name: LoggingApplicationName,
+					Repository: api.ChartRepository{
+						Name: LoggingApplicationName,
+						URL:  "https://charts.cnct.io",
+					},
+				},
+				Values: "fluent-bit:\n name: fluent-bit\n cluster_uuid: " + uuidForLogging.String() + "\n elasticSearchHost: es.aws.uswest1.hybridstack.cnct.io\n elasticSearchPassword: changeme",
+				Cluster: api.SDSClusterRef{
+					Name: clusterName,
+				},
+			},
+		}
+
+		// set owner reference
+		loggerApplication.OwnerReferences = []v1.OwnerReference{
+			*v1.NewControllerRef(freshCopy,
+				runtimeSchema.GroupVersionKind{
+					Group:   api.SchemeGroupVersion.Group,
+					Version: api.SchemeGroupVersion.Version,
+					Kind:    "SDSCluster",
+				}),
+		}
+
+		loggerApplication.Name = clusterLoggingApplicationName
+		loggerApplication.Namespace = viper.GetString(KubernetesNamespaceViperVariableName)
+		newLoggerApplication, err := c.client.CmaV1alpha1().SDSApplications(viper.GetString(KubernetesNamespaceViperVariableName)).Create(loggerApplication)
+		if err != nil {
+			logger.Errorf("something bad happened when creating the logging application for cluster -->%s<-- error: %s", clusterName, err)
+		}
+		logger.Infof("create logging application -->%s<-- for cluster -->%s<--", newLoggerApplication.Name, clusterName)
+	}
+	// End of logging
+
+	// parse the kubeconfig string for api endpoint
+	// ingress and service for managed cluster api server
+	clusterApiEndpointServiceName := ApiEndpointBackendServiceName + "-" + clusterName
+	apiEndpoint, err := k8sutil.GetClusterEndpoint(clusterInfo.Kubeconfig)
+	if err != nil {
+		logger.Errorf("something bad happened when getting api endpoint for cluster -->%s<-- error: %s", clusterName, err)
+	}
+
+	_, err = k8sutil.CreateExternalService(
+		k8sutil.GenerateExternalService(clusterApiEndpointServiceName, apiEndpoint),
+		freshCopy, nil)
+	if err != nil {
+		logger.Errorf("something bad happened when creating the service for cluster -->%s<-- error: %s", clusterName, err)
+	}
+
+	clusterApiEndpointIngressName := ApiEndpointIngressName + "-" + clusterName
+	_, err = k8sutil.CreateIngress(
+		k8sutil.GenerateIngress(clusterApiEndpointIngressName, clusterName, clusterApiEndpointServiceName),
+		freshCopy, nil)
+	if err != nil {
+		logger.Errorf("something bad happened when creating the ingress for cluster -->%s<-- error: %s", clusterName, err)
+	}
+
+	// bearer token service account
+	sdsTokenClient, err := sdstoken.NewSDSTokenClient(nil)
+	if err != nil {
+		logger.Errorf("unable to create new sds token client", err)
+	}
+	token, err := sdsTokenClient.CreateSDSToken(freshCopy, viper.GetString(KubernetesNamespaceViperVariableName))
+	if err != nil {
+		logger.Errorf("unable to create sds token, error message: %s", err)
+	}
+	clusterInfo.Bearertoken = string(token)
+	// End bearer token service account
 }
